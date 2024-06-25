@@ -1,7 +1,6 @@
 from fastapi import FastAPI
 from pydantic import BaseModel
-import pv_system_calculations as pv_calc
-from typing import List, Optional
+from . import pv_system_calculations as pv_calc
 
 app = FastAPI()
 

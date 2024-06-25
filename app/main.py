@@ -1,8 +1,25 @@
 from fastapi import FastAPI
 from pydantic import BaseModel
 from . import pv_system_calculations as pv_calc
+from fastapi.middleware.cors import CORSMiddleware
+
+
+# Allow CORS for frontend
+origins = [
+    "http://localhost:3000",  # Allow frontend origin
+    # Add any other origins as needed
+]
 
 app = FastAPI()
+
+# Add CORSMiddleware to the application
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=origins,  # List of allowed origins
+    allow_credentials=True,
+    allow_methods=["*"],  # Allow all methods
+    allow_headers=["*"],  # Allow all headers
+)
 
 class Location(BaseModel):
     longitude: float

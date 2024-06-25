@@ -155,8 +155,6 @@ def calculate_cost_savings(el_production_timeseries,el_demand_timeseries):
 
     # calculate the produced energy (kwh) in this quarter hour (power / 4)
     production_and_consumption['production_value_kwh'] = production_and_consumption['production_value'] * 0.25
-    sum_dc_output = production_and_consumption['production_value_kwh'].sum()
-    print(f"Sum of DC output: {sum_dc_output} KW h")
 
     # Berechne die gesparten Kosten
     # Der Strom, der selbst produziert wurde, muss nicht mehr eingekauft werden. Wenn werniger Strom gebraucht wird, als produziert, wird der 
@@ -174,7 +172,10 @@ def calculate_cost_savings(el_production_timeseries,el_demand_timeseries):
     # calculate the total saved costs
     total_saved_costs = production_and_consumption['saved_costs'].sum()
     
+    cost_savings_GGV = round(total_saved_costs,2)
 
-    cost_savings = total_saved_costs
+    production_surplus = production_and_consumption['production_value_kwh'] - production_and_consumption['H00 recalculated [kWh]']
+    production_surplus[production_surplus < 0] = 0
+    profit_grid_feed_in = round(production_surplus.sum() * 0.0803,2)
 
-    return  cost_savings
+    return  cost_savings_GGV, profit_grid_feed_in

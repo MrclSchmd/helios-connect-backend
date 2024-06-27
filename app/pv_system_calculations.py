@@ -2,49 +2,87 @@ from pvlib import pvsystem, modelchain, location
 import pandas as pd
 from pvlib.iotools import get_pvgis_tmy
 
-def create_pv_system(annual_el_demand):  
+def create_pv_system(annual_el_demand):
+    """
+    Create a PV system object with the given annual electricity demand.
+
+    Parameters
+    ----------
+    annual_el_demand: float
+        The annual electricity demand in kWh.
+
+    Returns
+    -------
+    pv_system: object
+        A PV system object with attributes for size, cost_per_kWp, and annual_production.
+    """ 
+    # Define a class for the PV system
     class pv_system:
         def __init__(self, size, cost_per_kWp, annual_production):
             self.size = size
             self.cost_per_kWp = cost_per_kWp
             self.annual_production = annual_production
 
-    # PV System size in kWp
+    # Estimate the PV system size in kWp
     pv_system.size = annual_el_demand / 1000
-
+    
     return pv_system
 
 
 def calculate_hourly_el_production(house, pv_system):
+    """
+    Calculate the hourly electricity production of the PV system by 
+    using the PVGIS API which generates typical meteorological year (TMY) 
+    data for a given location.
 
+    Parameters
+    ----------
+    house: class 
+        A class containing the location and rooftop information of the house.
+    pv_system: class
+        A class containing the size and cost_per_kWp of the PV system.
+
+    Returns
+    -------
+    sum_dc_output: float
+    production_timeseries: pd.DataFrame
+    """
+    # Generate typical meteorological year (TMY) data for given location
+    df, _, _, _ = get_pvgis_tmy(house.location.latitude, house.location.longitude, map_variables=True, startyear=2006)
+    
     # ghi = Global Horizontal Irradiance (W/m^2)
     # dhi = Diffuse Horizontal Irradiance (W/m^2)
     # dni = Direct Normal Irradiance (W/m^2)
 
-    latitude = house.location.latitude
-    longitude = house.location.longitude
-
-    df, _, _, metadata = get_pvgis_tmy(latitude, longitude, map_variables=True, startyear=2006)
-
+    # convert the index to datetime
     df.index = pd.to_datetime(df.index)
     df = df.sort_index()
 
+    # drop unnecessary columns
     df.drop(columns=['temp_air', 'relative_humidity', 'IR(h)', 'wind_speed', 'wind_direction', 'pressure'], inplace=True)
+    
+    # generate a continous datetime index for 2023
+    current_index = df.index
 
     # sort df by month and day (ignore year)
-    df['month'] = df.index.month
-    df['day'] = df.index.day
-    df['hour'] = df.index.hour
-    df['minute'] = df.index.minute
-    df['second'] = df.index.second
-    df['year'] = 2023
-    df['date'] = pd.to_datetime(df[['year', 'month', 'day', 'hour', 'minute', 'second']])
-    df.set_index('date', inplace=True)
-    df.drop(columns=['month', 'day', 'hour', 'minute', 'second', 'year'], inplace=True)
-    df = df.sort_values(by='date')
+    new_index = pd.to_datetime({
+        'year': 2023,
+        'month': current_index.month,
+        'day': current_index.day,
+        'hour': current_index.hour,
+        'minute': current_index.minute,
+        'second': current_index.second
+    }, utc=True)
+
+    # set new index
+    df.index = new_index
+    # Sort the dataframe by date
+    df.sort_index(inplace=True)
+    # # Sort the dataframe by date
+    # df.sort_values(by='date', inplace=True)
 
     # important variables
-    name_of_array = 'South-East-Facing Array'
+    name_of_array = 'main-module'
 
     # Simulate a PV system with the weather data
     # Define the PV system
@@ -57,7 +95,7 @@ def calculate_hourly_el_production(house, pv_system):
         pvsystem.Array(pvsystem.FixedMount(house.rooftop.tilt_angle, house.rooftop.azimut_angle), name=name_of_array,
                     **array_kwargs)
     ]
-    location_munich = location.Location(latitude, longitude)
+    location_munich = location.Location(house.location.latitude, house.location.longitude)
     system = pvsystem.PVSystem(arrays=arrays, inverter_parameters=dict(pdc0=pv_system.size))
     mc = modelchain.ModelChain(system, location_munich, aoi_model='physical',
                             spectral_model='no_loss')
@@ -77,59 +115,59 @@ def calculate_hourly_el_production(house, pv_system):
 
 
 def estimate_hourly_el_consumption(house):
+    """
+    Estimate the hourly electricity consumption of the house from total annual electricity consumption .
 
-    # important variables
-    power_consumption_per_year = house.annual_el_demand
+    Parameters
+    ----------
+    house: class 
+        A class containing information about total annual electricity consumption of the house.
 
+    Returns
+    -------
+    el_demand_timeseries: pd.DataFrame
+        A DataFrame containing the hourly electricity consumption data.
+    """
+    # import standard load profile data
     # read data/GGV_SLP_1000_MWh_2021_01-2020-09-24.csv from line 11
     df = pd.read_csv('data/GGV_SLP_1000_MWh_2021_01-2020-09-24.csv', skiprows=10, encoding='latin1', delimiter=';')
 
-    # drop the following columns:  G00 [kW]	G00 [kWh]	G10 [kW]	G10 [kWh]	G20 [kW]	G20 [kWh]	G30 [kW]	G30 [kWh]	G40 [kW]	G40 [kWh]	G50 [kW]	G50 [kWh]	G60 [kW]	G60 [kWh]	L00 [kW]	L00 [kWh]	L10 [kW]	L10 [kWh]	L20 [kW]	L20 [kWh]	Bnd [kW]	Bnd [kWh]	M00 [kW]	M00 [kWh]	KW1 [kW]	KW1 [kWh]
+    # drop unnecessary columns
     df.drop(columns=['G00 [kW]', 'G00 [kWh]', 'G10 [kW]', 'G10 [kWh]', 'G20 [kW]', 'G20 [kWh]', 'G30 [kW]', 'G30 [kWh]', 'G40 [kW]', 'G40 [kWh]', 'G50 [kW]', 'G50 [kWh]', 'G60 [kW]', 'G60 [kWh]', 'L00 [kW]', 'L00 [kWh]', 'L10 [kW]', 'L10 [kWh]', 'L20 [kW]', 'L20 [kWh]', 'Bnd [kW]', 'Bnd [kWh]', 'M00 [kW]', 'M00 [kWh]', 'KW1 [kW]', 'KW1 [kWh]'], inplace=True)
 
-    # drop the following columns: Messwert-Nr. , So-/Wi-Zeit , Monat, Tag, Wochentag, Datum, Ferien, Tagesart, Jahr, MP von,	MP bis
+    # drop unnecessary columns
     df.drop(columns=['Messwert-Nr.', 'So-/Wi-Zeit', 'Monat', 'Tag', 'Wochentag', 'Datum', 'Ferien', 'Tagesart', 'Jahr', 'MP von', 'MP bis'], inplace=True)
 
-    # make "Zeitstempel von" to datetime, now it is in the format  01.01.2021 00:00, so we need to convert it to 2021-01-01 00:00
+    # convert "Zeitstempel von" to datetime
     df['Zeitstempel von'] = pd.to_datetime(df['Zeitstempel von'], format='%d.%m.%Y %H:%M')
 
+    # sort dataframe by "Zeitstempel von"
     df.sort_values(by='Zeitstempel von', inplace=True)
 
+    # set "Zeitstempel von" as index
     df.set_index('Zeitstempel von', inplace=True)
 
     # drop NaN values
     df.dropna(inplace=True)
 
-    # make H00 [kW] to float
+    # convert H00 [kW] to float
     df['H00 [kW]'] = df['H00 [kW]'].str.replace(',', '.').astype(float)
-    # same with H00 [kWh]
+    # convert H00 [kWh] to float
     df['H00 [kWh]'] = df['H00 [kWh]'].str.replace(',', '.').astype(float)
 
-    # sum up the values of H00 [kWh] to get the total output
+    # calculate the total output
     total_output = df['H00 [kWh]'].sum()
-    # print(f"Total Output: {total_output} kWh")
 
-    # calculate the factor, to get 3000 kWh
-    factor = power_consumption_per_year / total_output
-    # print(f"Factor: {factor}")
+    # calculate the factor for linear scaling of the demand timeseries
+    factor = house.annual_el_demand / total_output
 
     # multiply the values of H00 [kW] with the factor
     df['H00 recalculated [kW]'] = df['H00 [kW]'] * factor
     # multiply the values of H00 [kWh] with the factor
     df['H00 recalculated [kWh]'] = df['H00 [kWh]'] * factor
 
-    # calculate the total output again (should be equal to the 3000 to calculate the factor)
+    # calculate the total output again
     total_output = df['H00 recalculated [kWh]'].sum()
-    # print(f"Total Output recalculated: {total_output} kWh")
-
-    # plot with plotly express
-        # import plotly.express as px
-        # import plotly.graph_objects as go
-
-        # fig = go.Figure()
-        # fig.add_trace(go.Scatter(x=df.index, y=df['H00 recalculated [kW]'], mode='lines', name='Total Output'))
-        # fig.update_layout(title=f"Power consumption over the year, total power consumption of {power_consumption_per_year} kWh")
-        # fig.show()
 
     # prepare consumption data
     consumption_data = df.drop(columns=['Zeitstempel bis', 'H00 [kW]', 'H00 [kWh]'])
@@ -142,40 +180,55 @@ def estimate_hourly_el_consumption(house):
     return el_demand_timeseries
 
 
-def calculate_cost_savings(el_production_timeseries,el_demand_timeseries):
+def calculate_cost_savings(el_production_timeseries, el_demand_timeseries):
+    """
+    Calculate the cost savings by sharing electricity in the house (GGV) and 
+    the profit from grid feed-in based on the hourly electricity production and consumption.
 
-    production_data = el_production_timeseries
-    consumption_data = el_demand_timeseries
+    Parameters
+    ----------
+    el_production_timeseries: pd.DataFrame
+        A DataFrame containing the hourly electricity production data.
+    el_demand_timeseries: pd.DataFrame
+        A DataFrame containing the hourly electricity consumption data.
 
-    # Merge the production  and the consumption fields
-    production_and_consumption = pd.merge(consumption_data, production_data, on='date', how='left')
+    Returns
+    -------
+    cost_savings_GGV: float
+        The total cost savings from self-consumption of electricity within the GGV.
+    profit_grid_feed_in: float
+        The profit from grid feed-in of surplus electricity.
+    """
+    # Merge the production and the consumption fields
+    production_and_consumption = pd.merge(el_demand_timeseries, el_production_timeseries, on='date', how='left')
 
-    # fill NaN values with the last value
+    # Fill NaN values with the last value
     production_and_consumption.fillna(method='bfill', inplace=True)
 
-    # calculate the produced energy (kwh) in this quarter hour (power / 4)
+    # Calculate the produced energy (kWh) in this quarter hour (power / 4)
     production_and_consumption['production_value_kwh'] = production_and_consumption['production_value'] * 0.25
 
-    # Berechne die gesparten Kosten
-    # Der Strom, der selbst produziert wurde, muss nicht mehr eingekauft werden. Wenn werniger Strom gebraucht wird, als produziert, wird der 
-    # Überschusstrom ins Netz eingespeist aber nicht vergütet. Es zählt also nur der Strom, der selbst verbraucht wird!
+    # Calculate the cost savings
+    # If more electricity is needed than produced -> the produced electricity does not need to be purchased -> savings of 0.3 ct/kWh
+    # If less electricity is needed than produced -> surplus electricity is fed into the grid -> feed-in tariff of 8.03 ct/kWh (2024)
 
-    # Price per KWh
-    electricity_price = 0.3
-
-    # calculate a dataframe with min(production, consumption) for each row -> This is the electricity produced and used for own needs
+    # Calculate a dataframe with min(production, consumption) for each row -> This is the electricity produced and used for own needs
     production_and_consumption['min_prod_cons'] = production_and_consumption[['H00 recalculated [kWh]', 'production_value_kwh']].min(axis=1)
 
-    # calculate the saved costs by multiplying the min with the electricity price
+    # Price per kWh
+    electricity_price = 0.3
+
+    # Calculate the saved costs by multiplying the min with the electricity price
     production_and_consumption['saved_costs'] = production_and_consumption['min_prod_cons'] * electricity_price
 
-    # calculate the total saved costs
-    total_saved_costs = production_and_consumption['saved_costs'].sum()
-    
-    cost_savings_GGV = round(total_saved_costs,2)
+    # Calculate the total saved costs (GGV)
+    cost_savings_GGV = round(production_and_consumption['saved_costs'].sum(),2)
 
+    # Calculate the production surplus
     production_surplus = production_and_consumption['production_value_kwh'] - production_and_consumption['H00 recalculated [kWh]']
     production_surplus[production_surplus < 0] = 0
-    profit_grid_feed_in = round(production_surplus.sum() * 0.0803,2)
 
-    return  cost_savings_GGV, profit_grid_feed_in
+    # Calculate the profit from grid feed-in
+    profit_grid_feed_in = round(production_surplus.sum() * 0.0803, 2)
+
+    return cost_savings_GGV, profit_grid_feed_in

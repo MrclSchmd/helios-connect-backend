@@ -1,4 +1,4 @@
-from pvlib import pvsystem, modelchain, location
+from pvlib import pvsystem, modelchain, location, temperature
 import pandas as pd
 from pvlib.iotools import get_pvgis_tmy
 
@@ -84,31 +84,39 @@ def calculate_hourly_el_production(house, pv_system):
 
     # Simulate a PV system with the weather data
     # Define the PV system
+
+    # get the temperature model parameters
+    temperature_model_parameters = temperature.TEMPERATURE_MODEL_PARAMETERS['sapm']['close_mount_glass_glass']
+
+    # define the array kwargs
+    # with gamma_pdc=-0.004, typical temperature coefficient of the DC power of the module
     array_kwargs = dict(
         module_parameters=dict(pdc0=pv_system.size, gamma_pdc=-0.004),
-        temperature_model_parameters=dict(a=-3.56, b=-0.075, deltaT=3)
+        temperature_model_parameters=temperature_model_parameters
     )
 
+    # define the array
     arrays = [
         pvsystem.Array(pvsystem.FixedMount(house.rooftop.tilt_angle, house.rooftop.azimut_angle), name=name_of_array,
                     **array_kwargs)
     ]
-    location_munich = location.Location(house.location.latitude, house.location.longitude)
+    # define the location
+    location_obj = location.Location(house.location.latitude, house.location.longitude)
     system = pvsystem.PVSystem(arrays=arrays, inverter_parameters=dict(pdc0=pv_system.size))
-    mc = modelchain.ModelChain(system, location_munich, aoi_model='physical',
+    mc = modelchain.ModelChain(system, location_obj, aoi_model='physical',
                             spectral_model='no_loss')
 
-    # pv system simulation
+    # run pv system simulation
     mc.run_model(df)
 
+    # get the results
     pv_simulation_results = mc.results.ac
 
     # calculate the sum of the DC output
     sum_dc_output = pv_simulation_results.sum()  
 
-    # el_production_timeseries = pd.DataFrame({'date': pv_simulation_results.index, 'production_value':pv_simulation_results.values})
+    # create a DataFrame with the hourly electricity production data
     el_production_timeseries = pd.DataFrame({'el_production':pv_simulation_results.values})
-    # el_production_timeseries['date'] = pd.to_datetime(el_production_timeseries['date'], utc=True)
     el_production_timeseries.index = pv_simulation_results.index
     el_production_timeseries.index.name='datetime'
         

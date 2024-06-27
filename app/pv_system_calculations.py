@@ -78,8 +78,6 @@ def calculate_hourly_el_production(house, pv_system):
     df.index = new_index
     # Sort the dataframe by date
     df.sort_index(inplace=True)
-    # # Sort the dataframe by date
-    # df.sort_values(by='date', inplace=True)
 
     # important variables
     name_of_array = 'main-module'
@@ -103,13 +101,16 @@ def calculate_hourly_el_production(house, pv_system):
     # pv system simulation
     mc.run_model(df)
 
-    resulting_values = mc.results.ac
+    pv_simulation_results = mc.results.ac
 
     # calculate the sum of the DC output
-    sum_dc_output = resulting_values.sum()  
+    sum_dc_output = pv_simulation_results.sum()  
 
-    el_production_timeseries = pd.DataFrame({'date': resulting_values.index, 'production_value':resulting_values.values})
-    el_production_timeseries['date'] = pd.to_datetime(el_production_timeseries['date'], utc=True)
+    # el_production_timeseries = pd.DataFrame({'date': pv_simulation_results.index, 'production_value':pv_simulation_results.values})
+    el_production_timeseries = pd.DataFrame({'el_production':pv_simulation_results.values})
+    # el_production_timeseries['date'] = pd.to_datetime(el_production_timeseries['date'], utc=True)
+    el_production_timeseries.index = pv_simulation_results.index
+    el_production_timeseries.index.name='datetime'
         
     return sum_dc_output, el_production_timeseries
 
@@ -129,53 +130,35 @@ def estimate_hourly_el_consumption(house):
         A DataFrame containing the hourly electricity consumption data.
     """
     # import standard load profile data
-    # read data/GGV_SLP_1000_MWh_2021_01-2020-09-24.csv from line 11
-    df = pd.read_csv('data/GGV_SLP_1000_MWh_2021_01-2020-09-24.csv', skiprows=10, encoding='latin1', delimiter=';')
-
-    # drop unnecessary columns
-    df.drop(columns=['G00 [kW]', 'G00 [kWh]', 'G10 [kW]', 'G10 [kWh]', 'G20 [kW]', 'G20 [kWh]', 'G30 [kW]', 'G30 [kWh]', 'G40 [kW]', 'G40 [kWh]', 'G50 [kW]', 'G50 [kWh]', 'G60 [kW]', 'G60 [kWh]', 'L00 [kW]', 'L00 [kWh]', 'L10 [kW]', 'L10 [kWh]', 'L20 [kW]', 'L20 [kWh]', 'Bnd [kW]', 'Bnd [kWh]', 'M00 [kW]', 'M00 [kWh]', 'KW1 [kW]', 'KW1 [kWh]'], inplace=True)
-
-    # drop unnecessary columns
-    df.drop(columns=['Messwert-Nr.', 'So-/Wi-Zeit', 'Monat', 'Tag', 'Wochentag', 'Datum', 'Ferien', 'Tagesart', 'Jahr', 'MP von', 'MP bis'], inplace=True)
+    # read required from data/GGV_SLP_1000_MWh_2021_01-2020-09-24.csv 
+    df = pd.read_csv('data/GGV_SLP_1000_MWh_2021_01-2020-09-24.csv', skiprows=10, encoding='latin1', delimiter=';',usecols=['Zeitstempel von', 'H00 [kWh]'])
 
     # convert "Zeitstempel von" to datetime
     df['Zeitstempel von'] = pd.to_datetime(df['Zeitstempel von'], format='%d.%m.%Y %H:%M')
 
-    # sort dataframe by "Zeitstempel von"
-    df.sort_values(by='Zeitstempel von', inplace=True)
-
-    # set "Zeitstempel von" as index
-    df.set_index('Zeitstempel von', inplace=True)
-
     # drop NaN values
     df.dropna(inplace=True)
 
-    # convert H00 [kW] to float
-    df['H00 [kW]'] = df['H00 [kW]'].str.replace(',', '.').astype(float)
+    # generate a continous datetime index for 2023
+    start_date = '2023-01-01 00:00:00'
+    end_date = '2023-12-31 23:45:00'
+    df.index = pd.date_range(start=start_date, end=end_date, freq='15T', tz='UTC')
+    df.index.name='datetime'
+
     # convert H00 [kWh] to float
     df['H00 [kWh]'] = df['H00 [kWh]'].str.replace(',', '.').astype(float)
 
-    # calculate the total output
-    total_output = df['H00 [kWh]'].sum()
+    # calculate the standard total annual electricity consumption
+    st_total_annual_consumption = df['H00 [kWh]'].sum()
 
     # calculate the factor for linear scaling of the demand timeseries
-    factor = house.annual_el_demand / total_output
+    scaling_factor = house.annual_el_demand / st_total_annual_consumption
 
-    # multiply the values of H00 [kW] with the factor
-    df['H00 recalculated [kW]'] = df['H00 [kW]'] * factor
     # multiply the values of H00 [kWh] with the factor
-    df['H00 recalculated [kWh]'] = df['H00 [kWh]'] * factor
-
-    # calculate the total output again
-    total_output = df['H00 recalculated [kWh]'].sum()
+    df['H00 recalculated [kWh]'] = df['H00 [kWh]'] * scaling_factor
 
     # prepare consumption data
-    consumption_data = df.drop(columns=['Zeitstempel bis', 'H00 [kW]', 'H00 [kWh]'])
-    consumption_data['date'] = consumption_data.index
-    consumption_data['date'] = pd.to_datetime(consumption_data['date'], utc=True)
-    # set year to 2023
-    consumption_data['date'] = consumption_data['date'] + pd.offsets.DateOffset(years=2)
-    el_demand_timeseries = consumption_data
+    el_demand_timeseries = df.drop(columns=['Zeitstempel von', 'H00 [kWh]'])
 
     return el_demand_timeseries
 
@@ -200,20 +183,21 @@ def calculate_cost_savings(el_production_timeseries, el_demand_timeseries):
         The profit from grid feed-in of surplus electricity.
     """
     # Merge the production and the consumption fields
-    production_and_consumption = pd.merge(el_demand_timeseries, el_production_timeseries, on='date', how='left')
+    production_and_consumption = pd.merge(el_demand_timeseries, el_production_timeseries, how='left', left_index=True, right_index=True)
 
     # Fill NaN values with the last value
-    production_and_consumption.fillna(method='bfill', inplace=True)
+    production_and_consumption.fillna(method='ffill', inplace=True)
 
     # Calculate the produced energy (kWh) in this quarter hour (power / 4)
-    production_and_consumption['production_value_kwh'] = production_and_consumption['production_value'] * 0.25
+    production_and_consumption['el_production [kWh]'] = production_and_consumption['el_production'] * 0.25
+    production_and_consumption.drop(columns=['el_production'], inplace=True)
 
     # Calculate the cost savings
     # If more electricity is needed than produced -> the produced electricity does not need to be purchased -> savings of 0.3 ct/kWh
     # If less electricity is needed than produced -> surplus electricity is fed into the grid -> feed-in tariff of 8.03 ct/kWh (2024)
 
     # Calculate a dataframe with min(production, consumption) for each row -> This is the electricity produced and used for own needs
-    production_and_consumption['min_prod_cons'] = production_and_consumption[['H00 recalculated [kWh]', 'production_value_kwh']].min(axis=1)
+    production_and_consumption['min_prod_cons'] = production_and_consumption[['H00 recalculated [kWh]', 'el_production [kWh]']].min(axis=1)
 
     # Price per kWh
     electricity_price = 0.3
@@ -225,10 +209,12 @@ def calculate_cost_savings(el_production_timeseries, el_demand_timeseries):
     cost_savings_GGV = round(production_and_consumption['saved_costs'].sum(),2)
 
     # Calculate the production surplus
-    production_surplus = production_and_consumption['production_value_kwh'] - production_and_consumption['H00 recalculated [kWh]']
-    production_surplus[production_surplus < 0] = 0
+    production_surplus = (production_and_consumption['el_production [kWh]'] - production_and_consumption['H00 recalculated [kWh]']).clip(lower=0)
+
+    # Feed-in tariff in 2024
+    feed_in_tariff = 0.0803
 
     # Calculate the profit from grid feed-in
-    profit_grid_feed_in = round(production_surplus.sum() * 0.0803, 2)
+    profit_grid_feed_in = round(production_surplus.sum() * feed_in_tariff, 2)
 
     return cost_savings_GGV, profit_grid_feed_in

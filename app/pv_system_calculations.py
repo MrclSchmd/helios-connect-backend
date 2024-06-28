@@ -113,14 +113,14 @@ def calculate_hourly_el_production(house, pv_system):
     pv_simulation_results = mc.results.ac
 
     # calculate the sum of the DC output
-    sum_dc_output = pv_simulation_results.sum()  
+    annual_el_production = round(pv_simulation_results.sum(), 2)  
 
     # create a DataFrame with the hourly electricity production data
     el_production_timeseries = pd.DataFrame({'el_production':pv_simulation_results.values})
     el_production_timeseries.index = pv_simulation_results.index
     el_production_timeseries.index.name='datetime'
         
-    return sum_dc_output, el_production_timeseries
+    return annual_el_production, el_production_timeseries
 
 
 def estimate_hourly_el_consumption(house):
@@ -226,3 +226,26 @@ def calculate_cost_savings(el_production_timeseries, el_demand_timeseries):
     profit_grid_feed_in = round(production_surplus.sum() * feed_in_tariff, 2)
 
     return cost_savings_GGV, profit_grid_feed_in
+
+def calculate_CO2_reduction(annual_el_production):
+    """
+    Calculate the CO2 reduction based on the annual electricity production of the PV system.
+
+    Parameters
+    ----------
+    annual_el_production: float
+        The annual electricity production of the PV system in kWh.
+
+    Returns
+    -------
+    CO2_reduction: float
+        The CO2 reduction in kg per year.
+    """
+    # CO2 emissions per kWh in Germany in 2023
+    # https://www.umweltbundesamt.de/themen/co2-emissionen-pro-kilowattstunde-strom-2023
+    CO2_emission_factor = 0.380 # kg/kWh
+
+    # Calculate the CO2 reduction
+    CO2_reduction = round(annual_el_production * CO2_emission_factor, 2)
+
+    return CO2_reduction

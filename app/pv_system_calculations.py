@@ -46,6 +46,7 @@ def calculate_hourly_el_production(house, pv_system):
     -------
     sum_dc_output: float
     production_timeseries: pd.DataFrame
+    monthly_production: pd.DataFrame
     """
     # Generate typical meteorological year (TMY) data for given location
     df, _, _, _ = get_pvgis_tmy(house.location.latitude, house.location.longitude, map_variables=True, startyear=2006)
@@ -118,9 +119,14 @@ def calculate_hourly_el_production(house, pv_system):
     # create a DataFrame with the hourly electricity production data
     el_production_timeseries = pd.DataFrame({'el_production':pv_simulation_results.values})
     el_production_timeseries.index = pv_simulation_results.index
-    el_production_timeseries.index.name='datetime'
+    el_production_timeseries.index.name ='datetime'
+
+    # resample the data to monthly values
+    monthly_el_production = el_production_timeseries.resample('M').sum().round(2)
+    monthly_el_production.index = monthly_el_production.index.strftime('%B')
+    monthly_el_production.index.name = 'Month'
         
-    return annual_el_production, el_production_timeseries
+    return annual_el_production, el_production_timeseries, monthly_el_production
 
 
 def estimate_hourly_el_consumption(house):

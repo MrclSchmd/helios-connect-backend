@@ -8,8 +8,6 @@ if project_path not in sys.path:
 
 from app import pv_system_calculations as pv_calc
 
-# Import the required module
-
 # Define the Location class
 class Location:
     longitude: float
@@ -54,7 +52,14 @@ el_demand_timeseries = pv_calc.estimate_hourly_el_consumption(house)
 cost_savings_GGV, profit_grid_feed_in = pv_calc.calculate_cost_savings(el_production_timeseries, el_demand_timeseries)
 
 # Calculate the CO2 reduction
-CO2_reduction = pv_calc.calculate_CO2_reduction(annual_el_production)
+annual_CO2_reduction, monthly_CO2_reduction = pv_calc.calculate_CO2_reduction(monthly_el_production)
 
 # Print the results
-print(annual_el_production, monthly_el_production, cost_savings_GGV, profit_grid_feed_in, CO2_reduction)
+print({
+        "annual_el_production": annual_el_production,
+        "monthly_el_production": monthly_el_production,
+        "cost_savings_GGV": cost_savings_GGV,
+        "profit_grid_feed_in": profit_grid_feed_in,
+        "annual_CO2_reduction": annual_CO2_reduction,
+        "monthly_CO2_reduction": monthly_CO2_reduction
+    })

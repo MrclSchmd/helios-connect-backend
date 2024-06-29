@@ -214,7 +214,7 @@ def calculate_cost_savings(el_production_timeseries, el_demand_timeseries):
     production_and_consumption['min_prod_cons'] = production_and_consumption[['H00 recalculated [kWh]', 'el_production [kWh]']].min(axis=1)
 
     # Price per kWh
-    electricity_price = 0.3
+    electricity_price = 0.27
 
     # Calculate the saved costs by multiplying the min with the electricity price
     production_and_consumption['saved_costs'] = production_and_consumption['min_prod_cons'] * electricity_price
@@ -233,7 +233,7 @@ def calculate_cost_savings(el_production_timeseries, el_demand_timeseries):
 
     return cost_savings_GGV, profit_grid_feed_in
 
-def calculate_CO2_reduction(annual_el_production):
+def calculate_CO2_reduction(monthly_el_production):
     """
     Calculate the CO2 reduction based on the annual electricity production of the PV system.
 
@@ -251,7 +251,9 @@ def calculate_CO2_reduction(annual_el_production):
     # https://www.umweltbundesamt.de/themen/co2-emissionen-pro-kilowattstunde-strom-2023
     CO2_emission_factor = 0.380 # kg/kWh
 
-    # Calculate the CO2 reduction
-    CO2_reduction = round(annual_el_production * CO2_emission_factor, 2)
+    # Calculate the monthly and annual CO2 reduction
+    monthly_CO2_reduction = round(monthly_el_production * CO2_emission_factor, 2)
+    monthly_CO2_reduction.rename(columns={'el_production':'CO2_reduction'}, inplace=True)
+    annual_CO2_reduction = float(monthly_CO2_reduction.sum())
 
-    return CO2_reduction
+    return annual_CO2_reduction, monthly_CO2_reduction

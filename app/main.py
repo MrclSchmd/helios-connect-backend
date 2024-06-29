@@ -48,20 +48,23 @@ def calculate_pv_system(house: House):
     Returns:
         dict: A dictionary containing the following information:
             - annual_el_production (float): The annual electricity production of the PV system.
+            - monthly_el_production (list): A list of monthly electricity production values.
             - cost_savings_GGV (float): The cost savings from using the PV system within the GGV.
             - profit_grid_feed_in (float): The profit from feeding excess electricity into the grid.
-            - CO2_reduction (float): The CO2 reduction achieved by using the PV system.
+            - annual_CO2_reduction (float): The annual CO2 reduction achieved by using the PV system.
+            - monthly_CO2_reduction (list): A list of monthly CO2 reduction values.
     """
     pv_system = pv_calc.create_pv_system(house.annual_el_demand)
     annual_el_production, el_production_timeseries, monthly_el_production = pv_calc.calculate_hourly_el_production(house,pv_system)
     el_demand_timeseries = pv_calc.estimate_hourly_el_consumption(house)
     cost_savings_GGV, profit_grid_feed_in = pv_calc.calculate_cost_savings(el_production_timeseries, el_demand_timeseries)
-    CO2_reduction = pv_calc.calculate_CO2_reduction(annual_el_production)
+    annual_CO2_reduction, monthly_CO2_reduction = pv_calc.calculate_CO2_reduction(monthly_el_production)
 
     return {
         "annual_el_production": annual_el_production,
         "monthly_el_production": monthly_el_production,
         "cost_savings_GGV": cost_savings_GGV,
         "profit_grid_feed_in": profit_grid_feed_in,
-        "CO2_reduction": CO2_reduction 
+        "annual_CO2_reduction": annual_CO2_reduction,
+        "monthly_CO2_reduction": monthly_CO2_reduction
     }

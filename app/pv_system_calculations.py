@@ -46,6 +46,7 @@ def calculate_hourly_el_production(house, pv_system):
     -------
     sum_dc_output: float
     production_timeseries: pd.DataFrame
+    monthly_production: pd.DataFrame
     """
     # Generate typical meteorological year (TMY) data for given location
     df, _, _, _ = get_pvgis_tmy(house.location.latitude, house.location.longitude, map_variables=True, startyear=2006)
@@ -113,14 +114,19 @@ def calculate_hourly_el_production(house, pv_system):
     pv_simulation_results = mc.results.ac
 
     # calculate the sum of the DC output
-    sum_dc_output = pv_simulation_results.sum()  
+    annual_el_production = round(pv_simulation_results.sum(), 2)  
 
     # create a DataFrame with the hourly electricity production data
     el_production_timeseries = pd.DataFrame({'el_production':pv_simulation_results.values})
     el_production_timeseries.index = pv_simulation_results.index
-    el_production_timeseries.index.name='datetime'
+    el_production_timeseries.index.name ='datetime'
+
+    # resample the data to monthly values
+    monthly_el_production = el_production_timeseries.resample('M').sum().round(2)
+    monthly_el_production.index = monthly_el_production.index.strftime('%B')
+    monthly_el_production.index.name = 'Month'
         
-    return sum_dc_output, el_production_timeseries
+    return annual_el_production, el_production_timeseries, monthly_el_production
 
 
 def estimate_hourly_el_consumption(house):
@@ -208,7 +214,7 @@ def calculate_cost_savings(el_production_timeseries, el_demand_timeseries):
     production_and_consumption['min_prod_cons'] = production_and_consumption[['H00 recalculated [kWh]', 'el_production [kWh]']].min(axis=1)
 
     # Price per kWh
-    electricity_price = 0.3
+    electricity_price = 0.27
 
     # Calculate the saved costs by multiplying the min with the electricity price
     production_and_consumption['saved_costs'] = production_and_consumption['min_prod_cons'] * electricity_price
@@ -226,3 +232,28 @@ def calculate_cost_savings(el_production_timeseries, el_demand_timeseries):
     profit_grid_feed_in = round(production_surplus.sum() * feed_in_tariff, 2)
 
     return cost_savings_GGV, profit_grid_feed_in
+
+def calculate_CO2_reduction(monthly_el_production):
+    """
+    Calculate the CO2 reduction based on the annual electricity production of the PV system.
+
+    Parameters
+    ----------
+    annual_el_production: float
+        The annual electricity production of the PV system in kWh.
+
+    Returns
+    -------
+    CO2_reduction: float
+        The CO2 reduction in kg per year.
+    """
+    # CO2 emissions per kWh in Germany in 2023
+    # https://www.umweltbundesamt.de/themen/co2-emissionen-pro-kilowattstunde-strom-2023
+    CO2_emission_factor = 0.380 # kg/kWh
+
+    # Calculate the monthly and annual CO2 reduction
+    monthly_CO2_reduction = round(monthly_el_production * CO2_emission_factor, 2)
+    monthly_CO2_reduction.rename(columns={'el_production':'CO2_reduction'}, inplace=True)
+    annual_CO2_reduction = float(monthly_CO2_reduction.sum())
+
+    return annual_CO2_reduction, monthly_CO2_reduction

@@ -7,7 +7,9 @@ from fastapi.middleware.cors import CORSMiddleware
 # Allow CORS for frontend
 origins = [
     "http://localhost:3000",  # Allow frontend origin
-    "http://helios-connect-frontend.185.170.114.79.sslip.io"
+    "http://helios-connect-frontend.185.170.114.79.sslip.io",
+    "https://helios-connect.de",
+    "https://www.helios-connect.de"
     # Add any other origins as needed
 ]
 

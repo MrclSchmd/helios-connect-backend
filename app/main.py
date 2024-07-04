@@ -53,6 +53,7 @@ def calculate_pv_system(house: House):
             - monthly_el_production (list): A list of monthly electricity production values.
             - cost_savings_GGV (float): The cost savings from using the PV system within the GGV.
             - profit_grid_feed_in (float): The profit from feeding excess electricity into the grid.
+            - payback_period (float): The payback period of the PV system in years.
             - annual_CO2_reduction (float): The annual CO2 reduction achieved by using the PV system.
             - monthly_CO2_reduction (list): A list of monthly CO2 reduction values.
     """
@@ -60,6 +61,7 @@ def calculate_pv_system(house: House):
     annual_el_production, el_production_timeseries, monthly_el_production = pv_calc.calculate_hourly_el_production(house,pv_system)
     el_demand_timeseries = pv_calc.estimate_hourly_el_consumption(house)
     cost_savings_GGV, profit_grid_feed_in = pv_calc.calculate_cost_savings(el_production_timeseries, el_demand_timeseries)
+    payback_period = pv_calc.calculate_payback_period(cost_savings_GGV, profit_grid_feed_in, pv_system.total_cost)
     annual_CO2_reduction, monthly_CO2_reduction = pv_calc.calculate_CO2_reduction(monthly_el_production)
 
     return {
@@ -67,6 +69,7 @@ def calculate_pv_system(house: House):
         "monthly_el_production": monthly_el_production,
         "cost_savings_GGV": cost_savings_GGV,
         "profit_grid_feed_in": profit_grid_feed_in,
+        "payback_period": payback_period,
         "annual_CO2_reduction": annual_CO2_reduction,
         "monthly_CO2_reduction": monthly_CO2_reduction
     }

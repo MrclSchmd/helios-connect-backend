@@ -54,12 +54,16 @@ cost_savings_GGV, profit_grid_feed_in = pv_calc.calculate_cost_savings(el_produc
 # Calculate the CO2 reduction
 annual_CO2_reduction, monthly_CO2_reduction = pv_calc.calculate_CO2_reduction(monthly_el_production)
 
+# Calculate the payback period
+payback_period = pv_calc.calculate_payback_period(cost_savings_GGV, profit_grid_feed_in, pv_system.total_cost)
+
 # Print the results
 print({
         "annual_el_production": annual_el_production,
         "monthly_el_production": monthly_el_production,
         "cost_savings_GGV": cost_savings_GGV,
         "profit_grid_feed_in": profit_grid_feed_in,
+        "payback_period": payback_period,
         "annual_CO2_reduction": annual_CO2_reduction,
         "monthly_CO2_reduction": monthly_CO2_reduction
     })

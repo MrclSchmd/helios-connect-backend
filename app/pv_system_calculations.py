@@ -18,13 +18,15 @@ def create_pv_system(annual_el_demand):
     """ 
     # Define a class for the PV system
     class pv_system:
-        def __init__(self, size, cost_per_kWp, annual_production):
+        def __init__(self, size, total_cost):
             self.size = size
-            self.cost_per_kWp = cost_per_kWp
-            self.annual_production = annual_production
+            self.total_cost = total_cost
 
     # Estimate the PV system size in kWp
     pv_system.size = annual_el_demand / 1000
+
+    # Define the cost per kWp for the PV system
+    pv_system.total_cost = pv_system.size * 1200
     
     return pv_system
 
@@ -232,6 +234,32 @@ def calculate_cost_savings(el_production_timeseries, el_demand_timeseries):
     profit_grid_feed_in = round(production_surplus.sum() * feed_in_tariff, 2)
 
     return cost_savings_GGV, profit_grid_feed_in
+
+
+def calculate_payback_period(cost_savings_GGV, profit_grid_feed_in, pv_system_cost):
+    """
+    Calculate the payback period of the PV system based on the cost savings and profit from grid feed-in.
+
+    Parameters
+    ----------
+    cost_savings_GGV: float
+        The total cost savings from self-consumption of electricity within the GGV.
+    profit_grid_feed_in: float
+        The profit from grid feed-in of surplus electricity.
+
+    Returns
+    -------
+    payback_period: float
+        The payback period of the PV system in years.
+    """
+    # Calculate the total profit
+    total_profit = cost_savings_GGV + profit_grid_feed_in
+
+    # Calculate the payback period
+    payback_period = round(pv_system_cost / total_profit, 1)
+
+    return payback_period
+
 
 def calculate_CO2_reduction(monthly_el_production):
     """

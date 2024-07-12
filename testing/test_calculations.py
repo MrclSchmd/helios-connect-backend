@@ -64,6 +64,7 @@ print({
         "cost_savings_GGV": cost_savings_GGV,
         "profit_grid_feed_in": profit_grid_feed_in,
         "payback_period": payback_period,
+        "money_invested": pv_system.total_cost,
         "annual_CO2_reduction": annual_CO2_reduction,
         "monthly_CO2_reduction": monthly_CO2_reduction
     })
